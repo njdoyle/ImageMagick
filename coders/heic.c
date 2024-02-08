@@ -1224,6 +1224,9 @@ static MagickBooleanType WriteHEICImage(const ImageInfo *image_info,
     MagickBooleanType
       lossless = image_info->quality >= 100 ? MagickTrue : MagickFalse;
 
+    const char
+      *option;
+
     struct heif_encoding_options
       *options;
 
@@ -1305,12 +1308,9 @@ static MagickBooleanType WriteHEICImage(const ImageInfo *image_info,
     status=IsHEIFSuccess(image,&error,exception);
     if (status == MagickFalse)
       break;
-#if LIBHEIF_NUMERIC_VERSION > 0x01060200
+#if LIBHEIF_NUMERIC_VERSION >= 0x01070000
     if (encode_avif != MagickFalse)
       {
-        const char
-          *option;
-
         option=GetImageOption(image_info,"heic:speed");
         if (option != (char *) NULL)
           {
@@ -1319,17 +1319,49 @@ static MagickBooleanType WriteHEICImage(const ImageInfo *image_info,
             if (status == MagickFalse)
               break;
           }
-        option=GetImageOption(image_info,"heic:chroma");
-        if (option != (char *) NULL)
-          {
-            error=heif_encoder_set_parameter(heif_encoder,"chroma",option);
-            status=IsHEIFSuccess(image,&error,exception);
-            if (status == MagickFalse)
-              break;
-          }
+      }
+#endif
+#if LIBHEIF_NUMERIC_VERSION >= 0x01080000
+    option=GetImageOption(image_info,"heic:chroma");
+    if (option != (char *) NULL)
+      {
+        error=heif_encoder_set_parameter(heif_encoder,"chroma",option);
+        status=IsHEIFSuccess(image,&error,exception);
+        if (status == MagickFalse)
+          break;
       }
 #endif
     options=heif_encoding_options_alloc();
+#if LIBHEIF_NUMERIC_VERSION >= 0x01100000
+    option=GetImageOption(image_info,"heic:chroma-downsampling-algorithm");
+    if (option != (char *) NULL)
+      {
+        if (LocaleCompare(option,"nearest-neighbor") == 0)
+          {
+            options->color_conversion_options.
+              preferred_chroma_downsampling_algorithm =
+                heif_chroma_downsampling_nearest_neighbor;
+            options->color_conversion_options.
+              only_use_preferred_chroma_algorithm = MagickTrue;
+          }
+        if (LocaleCompare(option,"average") == 0)
+          {
+            options->color_conversion_options.
+              preferred_chroma_downsampling_algorithm =
+                heif_chroma_downsampling_average;
+            options->color_conversion_options.
+              only_use_preferred_chroma_algorithm = MagickTrue;
+          }
+        if (LocaleCompare(option,"sharp-yuv") == 0)
+          {
+            options->color_conversion_options.
+              preferred_chroma_downsampling_algorithm =
+                heif_chroma_downsampling_sharp_yuv;
+            options->color_conversion_options.
+              only_use_preferred_chroma_algorithm = MagickTrue;
+          }
+      }
+#endif
 #if LIBHEIF_NUMERIC_VERSION >= 0x010e0000
     if (image->orientation != UndefinedOrientation)
       options->image_orientation=(enum heif_orientation) image->orientation;
